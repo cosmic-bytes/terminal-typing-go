@@ -37,20 +37,20 @@ func main() {
 }
 
 func gameLoop() {
-	quote, err := getRandomQuote()
-	if err != nil {
-		fmt.Println("Failed to fetch quote:", err)
-		os.Exit(1)
-	}
-
     db, err := openDatabase()
     if err != nil {
         log.Fatal(err)
     }
     defer db.Close()
 
-	currentSentence := quote[0].Quote
-    currentAuthor := quote[0].Author
+	quote, err := getRandomQuote(db)
+	if err != nil {
+		fmt.Println("Failed to fetch quote:", err)
+		os.Exit(1)
+	}
+
+	currentSentence := quote.Quote
+    currentAuthor := quote.Author
 	userInput := ""
 	score := 0
 	startedTyping := false // Keep track of whether the user started typing
@@ -98,14 +98,14 @@ func gameLoop() {
 				score = int(accuracy * 100) // Convert accuracy to percentage
 
 				if len(userInput) >= len(currentSentence) {
-					quote, err := getRandomQuote()
-					if err != nil {
-						fmt.Println("Failed to fetch quote:", err)
-						os.Exit(1)
-					}
+                    quote, err := getRandomQuote(db)
+                    if err != nil {
+                        fmt.Println("Failed to fetch quote:", err)
+                        os.Exit(1)
+                    }
 
-					currentSentence = quote[0].Quote
-                    currentAuthor = quote[0].Author
+                    currentSentence = quote.Quote
+                    currentAuthor = quote.Author
 					userInput = ""
 					typedCharacters = 0   // Reset typed characters for the new sentence
 					startedTyping = false // Reset the typing start flag
@@ -234,11 +234,40 @@ func min(a, b int) int {
 	return b
 }
 
-func getRandomQuote() ([]Quote, error) {
+func getRandomQuote(db *sql.DB) (Quote, error) {
+	quotes, err := getRandomQuoteFromAPI()
+	if err != nil {
+		return getRandomQuoteFromDatabase(db)
+	}
+	return quotes[0], nil
+}
+
+// func getRandomQuote() ([]Quote, error) {
+// 	client := http.Client{}
+// 	resp, err := client.Get("https://zenquotes.io/api/random")
+// 	if err != nil {
+// 		return nil, fmt.Errorf("failed to fetch quote: %w", err)
+// 	}
+// 	defer resp.Body.Close()
+// 
+// 	body, err := io.ReadAll(resp.Body)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("failed to read response body: %w", err)
+// 	}
+// 
+// 	var quotes []Quote
+// 	if err := json.Unmarshal(body, &quotes); err != nil {
+// 		return nil, fmt.Errorf("failed to parse response body: %w", err)
+// 	}
+// 
+// 	return quotes, nil
+// }
+
+func getRandomQuoteFromAPI() ([]Quote, error) {
 	client := http.Client{}
 	resp, err := client.Get("https://zenquotes.io/api/random")
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch quote: %w", err)
+		return nil, fmt.Errorf("failed to fetch quote from API: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -253,6 +282,16 @@ func getRandomQuote() ([]Quote, error) {
 	}
 
 	return quotes, nil
+}
+
+func getRandomQuoteFromDatabase(db *sql.DB) (Quote, error) {
+	var q, a string
+	query := "SELECT q, a FROM quotes ORDER BY RANDOM() LIMIT 1"
+	err := db.QueryRow(query).Scan(&q, &a)
+	if err != nil {
+		return Quote{}, fmt.Errorf("failed to fetch quote from database: %w", err)
+	}
+	return Quote{Quote: q, Author: a}, nil
 }
 
 func openDatabase() (*sql.DB, error) {
