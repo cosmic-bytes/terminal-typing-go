@@ -4,14 +4,15 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	_ "github.com/mattn/go-sqlite3"
-	"github.com/nsf/termbox-go"
 	"io"
 	"log"
 	"math/rand"
 	"net/http"
 	"os"
 	"time"
+
+	_ "github.com/mattn/go-sqlite3"
+	"github.com/nsf/termbox-go"
 )
 
 type Quote struct {
@@ -186,6 +187,7 @@ func drawTypingSpeed() {
 		termbox.SetCell(x+i, y, char, termbox.ColorDefault, termbox.ColorDefault)
 	}
 }
+
 func calculateAccuracy(input string, actual string) float64 {
 	commonLength := min(len(input), len(actual))
 	correctChars := 0
