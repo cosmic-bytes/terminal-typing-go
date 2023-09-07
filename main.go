@@ -176,33 +176,6 @@ func drawSentenceWithAuthor(sentence, author string) {
 	}
 }
 
-func drawSentence(sentence string) {
-	width, height := termbox.Size() // Get terminal size
-
-	maxLineWidth := int(float64(width) * 0.8) // 80% of the width
-	lines := []string{}
-
-	// Split the sentence into lines that fit within the maxLineWidth
-	for len(sentence) > maxLineWidth {
-		lines = append(lines, sentence[:maxLineWidth])
-		sentence = sentence[maxLineWidth:]
-	}
-	lines = append(lines, sentence)
-
-	// Calculate starting y-coordinate for vertical centering
-	sentenceHeight := len(lines)
-	y := (height - sentenceHeight) / 2
-
-	// Draw each line of the sentence in a separate area
-	for _, line := range lines {
-		x := (width - len(line)) / 2
-		for i, char := range line {
-			termbox.SetCell(x+i, y, char, termbox.ColorDefault, termbox.ColorDefault)
-		}
-		y++
-	}
-}
-
 func drawTypingSpeed() {
 	width, height := termbox.Size()
 	speedStr := fmt.Sprintf("Speed: %.2f CPS", typingSpeed)
@@ -242,27 +215,6 @@ func getRandomQuote(db *sql.DB) (Quote, error) {
 	return quotes[0], nil
 }
 
-// func getRandomQuote() ([]Quote, error) {
-// 	client := http.Client{}
-// 	resp, err := client.Get("https://zenquotes.io/api/random")
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to fetch quote: %w", err)
-// 	}
-// 	defer resp.Body.Close()
-// 
-// 	body, err := io.ReadAll(resp.Body)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to read response body: %w", err)
-// 	}
-// 
-// 	var quotes []Quote
-// 	if err := json.Unmarshal(body, &quotes); err != nil {
-// 		return nil, fmt.Errorf("failed to parse response body: %w", err)
-// 	}
-// 
-// 	return quotes, nil
-// }
-
 func getRandomQuoteFromAPI() ([]Quote, error) {
 	client := http.Client{}
 	resp, err := client.Get("https://zenquotes.io/api/random")
@@ -295,7 +247,7 @@ func getRandomQuoteFromDatabase(db *sql.DB) (Quote, error) {
 }
 
 func openDatabase() (*sql.DB, error) {
-    db, err := sql.Open("sqlite3", "mydatabase.db")
+    db, err := sql.Open("sqlite3", "quotes.db")
     if err != nil {
         return nil, err
     }
@@ -319,29 +271,27 @@ func addSqlQuote(db *sql.DB, quote, author string) error {
     return err
 }
 
-func getAllQuotes(db *sql.DB) ([]Quote, error) {
-    var quotes []Quote
+// func getAllQuotes(db *sql.DB) ([]Quote, error) {
+//     var quotes []Quote
 
-    rows, err := db.Query("SELECT quote, author FROM quotes")
-    if err != nil {
-        return nil, err
-    }
-    defer rows.Close()
+//     rows, err := db.Query("SELECT quote, author FROM quotes")
+//     if err != nil {
+//         return nil, err
+//     }
+//     defer rows.Close()
 
-    for rows.Next() {
-        var quote, author string
-        if err := rows.Scan(&quote, &author); err != nil {
-            return nil, err
-        }
+//     for rows.Next() {
+//         var quote, author string
+//         if err := rows.Scan(&quote, &author); err != nil {
+//             return nil, err
+//         }
 
-        quotes = append(quotes, Quote{Quote: quote, Author: author})
-    }
+//         quotes = append(quotes, Quote{Quote: quote, Author: author})
+//     }
 
-    if err := rows.Err(); err != nil {
-        return nil, err
-    }
+//     if err := rows.Err(); err != nil {
+//         return nil, err
+//     }
 
-    return quotes, nil
-}
-
-
+//     return quotes, nil
+// }
