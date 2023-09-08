@@ -239,13 +239,13 @@ func getRandomQuoteFromAPI() ([]Quote, error) {
 }
 
 func getRandomQuoteFromDatabase(db *sql.DB) (Quote, error) {
-	var q, a string
-	query := "SELECT q, a FROM quotes ORDER BY RANDOM() LIMIT 1"
-	err := db.QueryRow(query).Scan(&q, &a)
+	var text, author string
+	query := "SELECT text, author FROM quotes ORDER BY RANDOM() LIMIT 1"
+	err := db.QueryRow(query).Scan(&text, &author)
 	if err != nil {
 		return Quote{}, fmt.Errorf("failed to fetch quote from database: %w", err)
 	}
-	return Quote{Quote: q, Author: a}, nil
+	return Quote{Quote: text, Author: author}, nil
 }
 
 func openDatabase() (*sql.DB, error) {
@@ -255,7 +255,7 @@ func openDatabase() (*sql.DB, error) {
 	}
 
 	// Check if the database file exists
-	_, err = os.Stat("mydatabase.db")
+	_, err = os.Stat("quotes.db")
 	if os.IsNotExist(err) {
 		// Create the database file and any necessary tables
 		_, err = db.Exec("CREATE TABLE quotes (quote TEXT, author TEXT)")
@@ -269,7 +269,7 @@ func openDatabase() (*sql.DB, error) {
 }
 
 func addSqlQuote(db *sql.DB, quote, author string) error {
-	_, err := db.Exec("INSERT INTO quotes (quote, author) VALUES (?, ?)", quote, author)
+	_, err := db.Exec("INSERT INTO quotes (text, author) VALUES (?, ?)", quote, author)
 	return err
 }
 
