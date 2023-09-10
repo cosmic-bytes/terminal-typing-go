@@ -14,7 +14,6 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/nsf/termbox-go"
 )
-
 type Quote struct {
 	Quote  string `json:"q"`
 	Author string `json:"a"`
@@ -24,150 +23,168 @@ var startTime time.Time
 var typedCharacters int
 var typingSpeed float64
 
-func main() {
-	err := termbox.Init()
-	if err != nil {
-		fmt.Println("Failed to initialize termbox:", err)
-		os.Exit(1)
-	}
-	defer termbox.Close()
-
-	rand.Seed(time.Now().UnixNano())
-
-	gameLoop()
+type Game struct {
+	db            *sql.DB
+	currentQuote  Quote
+	userInput     string
+	score         int
+	typedChars    int
+	startedTyping bool
+	typingSpeed   float64
+    startTime     time.Time
 }
 
-func gameLoop() {
+func main() {
+    // Create a new game instance
+    game, err := NewGame()
+    if err != nil {
+        // Handle the error if initialization fails
+        panic(err)
+    }
+
+    // Start the game loop
+    game.Start()
+}
+
+func NewGame() (*Game, error) {
+	err := termbox.Init()
+	if err != nil {
+		return nil, err
+	}
+	rand.Seed(time.Now().UnixNano())
+
 	db, err := openDatabase()
 	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	quote, err := getRandomQuote(db)
-	if err != nil {
-		fmt.Println("Failed to fetch quote:", err)
-		os.Exit(1)
+		return nil, err
 	}
 
-	currentSentence := quote.Quote
-	currentAuthor := quote.Author
-	userInput := ""
-	score := 0
-	startedTyping := false // Keep track of whether the user started typing
+	return &Game{
+		db: db,
+	}, nil
+}
 
-	err = addSqlQuote(db, currentSentence, currentAuthor)
-	if err != nil {
-		log.Fatal(err)
-	}
+func (g *Game) Start() {
+	defer termbox.Close()
+	g.runGameLoop()
+}
+
+func (g *Game) runGameLoop() {
+	// Initialize the game state
+	g.initGame()
 
 	for {
 		termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
-		drawSentenceWithAuthor(currentSentence, currentAuthor)
-		drawInput(userInput)
-		drawScore(score)
-		drawTypingSpeed()
-
-		termbox.Flush() // Flush the changes to the terminal screen
+		g.drawSentenceWithAuthor()
+		g.drawInput()
+		g.drawScore()
+		g.drawTypingSpeed()
+		termbox.Flush()
 
 		ev := termbox.PollEvent()
 		if ev.Type == termbox.EventKey {
 			if ev.Key == termbox.KeyEsc {
 				break
 			} else if ev.Key == termbox.KeyBackspace || ev.Key == termbox.KeyBackspace2 {
-				if len(userInput) > 0 {
-					userInput = userInput[:len(userInput)-1] // Remove the last character
-				}
+				g.handleBackspace()
 			} else if ev.Ch != 0 || ev.Key == termbox.KeySpace {
-				if !startedTyping {
-					startedTyping = true
-					startTime = time.Now() // Start the timer when user starts typing
-				}
-
-				typedCharacters++
-				if ev.Ch != 0 {
-					userInput += string(ev.Ch)
-				} else if ev.Key == termbox.KeySpace {
-					userInput += " "
-				}
-
-				// Calculate typing speed
-				elapsedTime := time.Since(startTime).Seconds()
-				typingSpeed = float64(typedCharacters) / elapsedTime
-
-				accuracy := calculateAccuracy(userInput, currentSentence)
-				score = int(accuracy * 100) // Convert accuracy to percentage
-
-				if len(userInput) >= len(currentSentence) {
-					quote, err := getRandomQuote(db)
-					if err != nil {
-						fmt.Println("Failed to fetch quote:", err)
-						os.Exit(1)
-					}
-
-					currentSentence = quote.Quote
-					currentAuthor = quote.Author
-					userInput = ""
-					typedCharacters = 0   // Reset typed characters for the new sentence
-					startedTyping = false // Reset the typing start flag
-					err = addSqlQuote(db, currentSentence, currentAuthor)
-					if err != nil {
-						log.Fatal(err)
-					}
-				}
+				g.handleInputCharacter(ev)
 			}
 		}
 	}
 }
 
-func drawScore(score int) {
-	width, _ := termbox.Size() // Get terminal width
+func (g *Game) initGame() {
+	quote, err := getRandomQuote(g.db)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	g.currentQuote = quote
+	g.userInput = ""
+	// Remove the following line to preserve the score
+	// g.score = 0
+	// Remove the following line to retain the typing speed
+	// g.typedChars = 0
+	// g.startedTyping = false
+
+	// Retain the typing speed and startTime
+	if !g.startedTyping {
+		g.startTime = time.Now()
+	}
+}
+
+func (g *Game) handleBackspace() {
+	if len(g.userInput) > 0 {
+		g.userInput = g.userInput[:len(g.userInput)-1]
+	}
+}
+
+func (g *Game) handleInputCharacter(ev termbox.Event) {
+	if !g.startedTyping {
+		g.startedTyping = true
+		g.startTime = time.Now()
+	}
+
+	g.typedChars++
+	if ev.Ch != 0 {
+		g.userInput += string(ev.Ch)
+	} else if ev.Key == termbox.KeySpace {
+		g.userInput += " "
+	}
+
+	elapsedTime := time.Since(g.startTime).Seconds()
+	g.typingSpeed = float64(g.typedChars) / elapsedTime
+
+	accuracy := calculateAccuracy(g.userInput, g.currentQuote.Quote)
+	g.score = int(accuracy * 100)
+
+	if len(g.userInput) >= len(g.currentQuote.Quote) {
+		g.initGame()
+		addSqlQuote(g.db, g.currentQuote.Quote, g.currentQuote.Author)
+	}
+}
+
+func (g *Game) drawScore() {
+	width, _ := termbox.Size()
 	x := width - 10
 	y := 1
-	scoreStr := fmt.Sprintf("Score: %d", score)
+	scoreStr := fmt.Sprintf("Score: %d", g.score)
 
 	for i, char := range scoreStr {
 		termbox.SetCell(x+i, y, char, termbox.ColorDefault, termbox.ColorDefault)
 	}
 }
 
-func drawInput(input string) {
-	width, height := termbox.Size() // Get terminal size
-	x := (width - len(input)) / 2
+func (g *Game) drawInput() {
+	width, height := termbox.Size()
+	x := (width - len(g.userInput)) / 2
 	y := height/2 + 1
-	// Draw the user input using termbox.SetCell
-	for i, char := range input {
+
+	for i, char := range g.userInput {
 		termbox.SetCell(x+i, y, char, termbox.ColorDefault, termbox.ColorDefault)
 	}
 }
 
-func drawSentenceWithAuthor(sentence, author string) {
-	width, height := termbox.Size() // Get terminal size
-
-	maxLineWidth := int(float64(width) * 0.8) // 80% of the width
+func (g *Game) drawSentenceWithAuthor() {
+	width, height := termbox.Size()
+	maxLineWidth := int(float64(width) * 0.8)
 	lines := []string{}
 
-	// Split the sentence into lines that fit within the maxLineWidth
-	for len(sentence) > maxLineWidth {
-		lines = append(lines, sentence[:maxLineWidth])
-		sentence = sentence[maxLineWidth:]
+	for len(g.currentQuote.Quote) > maxLineWidth {
+		lines = append(lines, g.currentQuote.Quote[:maxLineWidth])
+		g.currentQuote.Quote = g.currentQuote.Quote[maxLineWidth:]
 	}
-	lines = append(lines, sentence)
+	lines = append(lines, g.currentQuote.Quote)
 
-	// Calculate starting y-coordinate for vertical centering
 	sentenceHeight := len(lines)
 	y := (height - sentenceHeight) / 2
+	authorX := (width - len(g.currentQuote.Author)) / 2
+	authorY := y - 2
 
-	// Draw each line of the author's name above the sentence block
-	authorX := (width - len(author)) / 2
-	authorY := y - 2 // Adjust the gap between author and sentence
-
-	for i, char := range author {
-		// Use a different font or style for the author, if supported
+	for i, char := range g.currentQuote.Author {
 		termbox.SetCell(authorX+i, authorY, char, termbox.ColorMagenta, termbox.ColorDefault)
 	}
 
-	// Draw each line of the sentence in a separate area
 	for _, line := range lines {
 		x := (width - len(line)) / 2
 		for i, char := range line {
@@ -177,11 +194,11 @@ func drawSentenceWithAuthor(sentence, author string) {
 	}
 }
 
-func drawTypingSpeed() {
+func (g *Game) drawTypingSpeed() {
 	width, height := termbox.Size()
-	speedStr := fmt.Sprintf("Speed: %.2f CPS", typingSpeed)
-	x := width - len(speedStr) - 1 // Leave a margin from the right edge
-	y := height - 1                // Bottom of the terminal
+	speedStr := fmt.Sprintf("Speed: %.2f CPS", g.typingSpeed)
+	x := width - len(speedStr) - 1
+	y := height - 1
 
 	for i, char := range speedStr {
 		termbox.SetCell(x+i, y, char, termbox.ColorDefault, termbox.ColorDefault)
