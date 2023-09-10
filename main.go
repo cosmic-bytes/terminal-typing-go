@@ -272,28 +272,3 @@ func addSqlQuote(db *sql.DB, quote, author string) error {
 	_, err := db.Exec("INSERT INTO quotes (text, author) VALUES (?, ?)", quote, author)
 	return err
 }
-
-// func getAllQuotes(db *sql.DB) ([]Quote, error) {
-//     var quotes []Quote
-
-//     rows, err := db.Query("SELECT quote, author FROM quotes")
-//     if err != nil {
-//         return nil, err
-//     }
-//     defer rows.Close()
-
-//     for rows.Next() {
-//         var quote, author string
-//         if err := rows.Scan(&quote, &author); err != nil {
-//             return nil, err
-//         }
-
-//         quotes = append(quotes, Quote{Quote: quote, Author: author})
-//     }
-
-//     if err := rows.Err(); err != nil {
-//         return nil, err
-//     }
-
-//     return quotes, nil
-// }
