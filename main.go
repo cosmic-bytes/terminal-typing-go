@@ -27,11 +27,13 @@ type Game struct {
 	db            *sql.DB
 	currentQuote  Quote
 	userInput     string
-	score         int
+	accuracy      int
 	typedChars    int
 	startedTyping bool
 	typingSpeed   float64
     startTime     time.Time
+    score         int
+    highScore     int
 }
 
 func main() {
@@ -136,23 +138,40 @@ func (g *Game) handleInputCharacter(ev termbox.Event) {
 	g.typingSpeed = float64(g.typedChars) / elapsedTime
 
 	accuracy := calculateAccuracy(g.userInput, g.currentQuote.Quote)
-	g.score = int(accuracy * 100)
+	g.accuracy = int(accuracy * 100)
 
 	if len(g.userInput) >= len(g.currentQuote.Quote) {
-		g.initGame()
+
+        if g.score > g.highScore {
+            g.highScore = g.score
+        }
+
+        g.initGame()
 		addSqlQuote(g.db, g.currentQuote.Quote, g.currentQuote.Author)
 	}
 }
 
-func (g *Game) drawScore() {
+func (g *Game) drawTopBar() {
 	width, _ := termbox.Size()
-	x := width - 10
-	y := 1
-	scoreStr := fmt.Sprintf("Score: %d", g.score)
+    g.score = (2 * g.accuracy)*int(g.typingSpeed)
 
-	for i, char := range scoreStr {
+    topBarStr := fmt.Sprintf("Highscore: %d k   Score: %d k   Accuracy: %d   Speed: %.2f CPS", g.highScore, g.score,  g.accuracy, g.typingSpeed)
+	x := (width - len(topBarStr)) / 2
+	y := 1
+
+	for i, char := range topBarStr {
 		termbox.SetCell(x+i, y, char, termbox.ColorDefault, termbox.ColorDefault)
 	}
+}
+
+func (g *Game) drawScore() {
+	// Clear the top bar
+	width, _ := termbox.Size()
+	for i := 0; i < width; i++ {
+		termbox.SetCell(i, 1, ' ', termbox.ColorDefault, termbox.ColorDefault)
+	}
+
+	g.drawTopBar()
 }
 
 func (g *Game) drawInput() {
@@ -168,13 +187,14 @@ func (g *Game) drawInput() {
 func (g *Game) drawSentenceWithAuthor() {
 	width, height := termbox.Size()
 	maxLineWidth := int(float64(width) * 0.8)
+	quote := g.currentQuote.Quote // Create a copy of the original quote
 	lines := []string{}
 
-	for len(g.currentQuote.Quote) > maxLineWidth {
-		lines = append(lines, g.currentQuote.Quote[:maxLineWidth])
-		g.currentQuote.Quote = g.currentQuote.Quote[maxLineWidth:]
+	for len(quote) > maxLineWidth {
+		lines = append(lines, quote[:maxLineWidth])
+		quote = quote[maxLineWidth:]
 	}
-	lines = append(lines, g.currentQuote.Quote)
+	lines = append(lines, quote)
 
 	sentenceHeight := len(lines)
 	y := (height - sentenceHeight) / 2
@@ -195,14 +215,13 @@ func (g *Game) drawSentenceWithAuthor() {
 }
 
 func (g *Game) drawTypingSpeed() {
-	width, height := termbox.Size()
-	speedStr := fmt.Sprintf("Speed: %.2f CPS", g.typingSpeed)
-	x := width - len(speedStr) - 1
-	y := height - 1
-
-	for i, char := range speedStr {
-		termbox.SetCell(x+i, y, char, termbox.ColorDefault, termbox.ColorDefault)
+	// Clear the top bar
+	width, _ := termbox.Size()
+	for i := 0; i < width; i++ {
+		termbox.SetCell(i, 1, ' ', termbox.ColorDefault, termbox.ColorDefault)
 	}
+
+	g.drawTopBar()
 }
 
 func calculateAccuracy(input string, actual string) float64 {
