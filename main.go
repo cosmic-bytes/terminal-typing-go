@@ -19,10 +19,6 @@ type Quote struct {
 	Author string `json:"a"`
 }
 
-var startTime time.Time
-var typedCharacters int
-var typingSpeed float64
-
 type Game struct {
 	db            *sql.DB
 	currentQuote  Quote
