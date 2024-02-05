@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"time"
+    "strings"
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/nsf/termbox-go"
@@ -24,12 +25,15 @@ type Game struct {
 	currentQuote  Quote
 	userInput     string
 	accuracy      int
-	typedChars    int
+	roundChars    int
+	totalChars    int
 	startedTyping bool
 	typingSpeed   float64
     startTime     time.Time
     score         int
     highScore     int
+    roundTime    float64 
+    totalTime    float64 
 }
 
 func main() {
@@ -99,16 +103,8 @@ func (g *Game) initGame() {
 
 	g.currentQuote = quote
 	g.userInput = ""
-	// Remove the following line to preserve the score
-	// g.score = 0
-	// Remove the following line to retain the typing speed
-	// g.typedChars = 0
-	// g.startedTyping = false
+	g.startedTyping = false
 
-	// Retain the typing speed and startTime
-	if !g.startedTyping {
-		g.startTime = time.Now()
-	}
 }
 
 func (g *Game) handleBackspace() {
@@ -119,24 +115,28 @@ func (g *Game) handleBackspace() {
 
 func (g *Game) handleInputCharacter(ev termbox.Event) {
 	if !g.startedTyping {
+        g.roundChars = 0
+        g.roundTime = 0
 		g.startedTyping = true
 		g.startTime = time.Now()
 	}
 
-	g.typedChars++
+	g.roundChars++
 	if ev.Ch != 0 {
 		g.userInput += string(ev.Ch)
 	} else if ev.Key == termbox.KeySpace {
 		g.userInput += " "
 	}
 
-	elapsedTime := time.Since(g.startTime).Seconds()
-	g.typingSpeed = float64(g.typedChars) / elapsedTime
+	g.roundTime = time.Since(g.startTime).Seconds()
+	g.typingSpeed = float64(g.roundChars) / g.roundTime
 
 	accuracy := calculateAccuracy(g.userInput, g.currentQuote.Quote)
 	g.accuracy = int(accuracy * 100)
 
 	if len(g.userInput) >= len(g.currentQuote.Quote) {
+        g.totalTime = g.totalTime + g.roundTime
+        g.totalChars = g.totalChars + g.roundChars
 
         if g.score > g.highScore {
             g.highScore = g.score
@@ -151,7 +151,7 @@ func (g *Game) drawTopBar() {
 	width, _ := termbox.Size()
     g.score = (2 * g.accuracy)*int(g.typingSpeed)
 
-    topBarStr := fmt.Sprintf("Highscore: %d k   Score: %d k   Accuracy: %d   Speed: %.2f CPS", g.highScore, g.score,  g.accuracy, g.typingSpeed)
+    topBarStr := fmt.Sprintf("Highscore: %d k | Score: %d k | Accuracy: %d | Speed: %.2f CPS | Started: %t | Chars: %d | Time: %d", g.highScore, g.score,  g.accuracy, g.typingSpeed, g.startedTyping, g.roundChars, int(g.roundTime))
 	x := (width - len(topBarStr)) / 2
 	y := 1
 
@@ -183,7 +183,7 @@ func (g *Game) drawInput() {
 func (g *Game) drawSentenceWithAuthor() {
 	width, height := termbox.Size()
 	maxLineWidth := int(float64(width) * 0.8)
-	quote := g.currentQuote.Quote // Create a copy of the original quote
+	quote := strings.Trim(g.currentQuote.Quote, " ") 
 	lines := []string{}
 
 	for len(quote) > maxLineWidth {
