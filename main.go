@@ -32,8 +32,8 @@ type Game struct {
     startTime     time.Time
     score         int
     highScore     int
-    roundTime    float64 
-    totalTime    float64 
+    roundTime     float64 
+    totalTime     float64 
 }
 
 func main() {
