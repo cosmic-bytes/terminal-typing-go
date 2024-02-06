@@ -9,12 +9,13 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"strings"
 	"time"
-    "strings"
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/nsf/termbox-go"
 )
+
 type Quote struct {
 	Quote  string `json:"q"`
 	Author string `json:"a"`
@@ -29,23 +30,23 @@ type Game struct {
 	totalChars    int
 	startedTyping bool
 	typingSpeed   float64
-    startTime     time.Time
-    score         int
-    highScore     int
-    roundTime     float64 
-    totalTime     float64 
+	startTime     time.Time
+	score         int
+	highScore     int
+	roundTime     float64
+	totalTime     float64
 }
 
 func main() {
-    // Create a new game instance
-    game, err := NewGame()
-    if err != nil {
-        // Handle the error if initialization fails
-        panic(err)
-    }
+	// Create a new game instance
+	game, err := NewGame()
+	if err != nil {
+		// Handle the error if initialization fails
+		panic(err)
+	}
 
-    // Start the game loop
-    game.Start()
+	// Start the game loop
+	game.Start()
 }
 
 func NewGame() (*Game, error) {
@@ -113,12 +114,29 @@ func (g *Game) handleBackspace() {
 	}
 }
 
+func (g *Game) handleControlBackspace() {
+	if len(g.userInput) > 0 {
+		g.deleteLastWord()
+	}
+}
+
+func (g *Game) deleteLastWord() {
+	// Find the index of the last space in the user input
+	lastSpaceIndex := len(g.userInput) - 1
+	for lastSpaceIndex >= 0 && g.userInput[lastSpaceIndex] != ' ' {
+		lastSpaceIndex--
+	}
+
+	// Remove the last word from the user input
+	g.userInput = g.userInput[:lastSpaceIndex+1]
+}
+
 func (g *Game) handleInputCharacter(ev termbox.Event) {
 	if !g.startedTyping {
-        g.roundChars = 0
-        g.roundTime = 0
 		g.startedTyping = true
 		g.startTime = time.Now()
+		g.roundChars = 0
+		g.roundTime = 0
 	}
 
 	g.roundChars++
@@ -135,23 +153,23 @@ func (g *Game) handleInputCharacter(ev termbox.Event) {
 	g.accuracy = int(accuracy * 100)
 
 	if len(g.userInput) >= len(g.currentQuote.Quote) {
-        g.totalTime = g.totalTime + g.roundTime
-        g.totalChars = g.totalChars + g.roundChars
+		g.totalTime = g.totalTime + g.roundTime
+		g.totalChars = g.totalChars + g.roundChars
 
-        if g.score > g.highScore {
-            g.highScore = g.score
-        }
+		if g.score > g.highScore {
+			g.highScore = g.score
+		}
 
-        g.initGame()
+		g.initGame()
 		addSqlQuote(g.db, g.currentQuote.Quote, g.currentQuote.Author)
 	}
 }
 
 func (g *Game) drawTopBar() {
 	width, _ := termbox.Size()
-    g.score = (2 * g.accuracy)*int(g.typingSpeed)
+	g.score = (2 * g.accuracy) * int(g.typingSpeed)
 
-    topBarStr := fmt.Sprintf("Highscore: %d k | Score: %d k | Accuracy: %d | Speed: %.2f CPS | Started: %t | Chars: %d | Time: %d", g.highScore, g.score,  g.accuracy, g.typingSpeed, g.startedTyping, g.roundChars, int(g.roundTime))
+	topBarStr := fmt.Sprintf("Highscore: %d k | Score: %d k | Accuracy: %d | Speed: %.2f CPS | Started: %t | Chars: %d | Time: %d", g.highScore, g.score, g.accuracy, g.typingSpeed, g.startedTyping, g.roundChars, int(g.roundTime))
 	x := (width - len(topBarStr)) / 2
 	y := 1
 
@@ -183,7 +201,7 @@ func (g *Game) drawInput() {
 func (g *Game) drawSentenceWithAuthor() {
 	width, height := termbox.Size()
 	maxLineWidth := int(float64(width) * 0.8)
-	quote := strings.Trim(g.currentQuote.Quote, " ") 
+	quote := strings.Trim(g.currentQuote.Quote, " ")
 	lines := []string{}
 
 	for len(quote) > maxLineWidth {
