@@ -29,6 +29,7 @@ type Game struct {
 	roundChars    int
 	totalChars    int
 	startedTyping bool
+    wordsPerMin   float64
 	typingSpeed   float64
 	startTime     time.Time
 	score         int
@@ -71,16 +72,20 @@ func (g *Game) Start() {
 	g.runGameLoop()
 }
 
+func (g *Game) drawAll() {
+    g.drawSentenceWithAuthor()
+    g.drawInput()
+    g.drawScore()
+    g.drawTypingSpeed()
+}
+
 func (g *Game) runGameLoop() {
 	// Initialize the game state
 	g.initGame()
 
 	for {
 		termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
-		g.drawSentenceWithAuthor()
-		g.drawInput()
-		g.drawScore()
-		g.drawTypingSpeed()
+        g.drawAll()
 		termbox.Flush()
 
 		ev := termbox.PollEvent()
@@ -101,6 +106,7 @@ func (g *Game) initGame() {
 	if err != nil {
 		log.Fatal(err)
 	}
+    quote.Quote = strings.Trim(quote.Quote, " ")
 
 	g.currentQuote = quote
 	g.userInput = ""
@@ -115,9 +121,14 @@ func (g *Game) handleBackspace() {
 }
 
 func (g *Game) handleControlBackspace() {
-	if len(g.userInput) > 0 {
-		g.deleteLastWord()
-	}
+    if len(g.userInput) > 0 {
+        lastChar := g.userInput[len(g.userInput)-1]
+        if lastChar != ' ' {
+            g.deleteLastWord()
+        } else {
+            g.handleBackspace()
+        }
+    }
 }
 
 func (g *Game) deleteLastWord() {
@@ -148,6 +159,7 @@ func (g *Game) handleInputCharacter(ev termbox.Event) {
 
 	g.roundTime = time.Since(g.startTime).Seconds()
 	g.typingSpeed = float64(g.roundChars) / g.roundTime
+    g.calculateWordsPerMinute()
 
 	accuracy := calculateAccuracy(g.userInput, g.currentQuote.Quote)
 	g.accuracy = int(accuracy * 100)
@@ -165,11 +177,22 @@ func (g *Game) handleInputCharacter(ev termbox.Event) {
 	}
 }
 
+func (g *Game) calculateWordsPerMinute(){
+	g.wordsPerMin = g.typingSpeed * (60 / 5)
+}
+
+func (g *Game) calculateScore(){
+	g.score = (2 * g.accuracy) * int(g.typingSpeed)
+}
+
 func (g *Game) drawTopBar() {
 	width, _ := termbox.Size()
-	g.score = (2 * g.accuracy) * int(g.typingSpeed)
 
-	topBarStr := fmt.Sprintf("Highscore: %d k | Score: %d k | Accuracy: %d | Speed: %.2f CPS | Started: %t | Chars: %d | Time: %d", g.highScore, g.score, g.accuracy, g.typingSpeed, g.startedTyping, g.roundChars, int(g.roundTime))
+    g.calculateScore()
+
+    g.calculateWordsPerMinute()
+
+	topBarStr := fmt.Sprintf("Highscore: %d k | Score: %d k | Accuracy: %d | Speed: %.2f WPM | Started: %t | Chars: %d | Time: %d", g.highScore, g.score, g.accuracy, g.wordsPerMin, g.startedTyping, g.roundChars, int(g.roundTime))
 	x := (width - len(topBarStr)) / 2
 	y := 1
 
@@ -194,14 +217,19 @@ func (g *Game) drawInput() {
 	y := height/2 + 1
 
 	for i, char := range g.userInput {
-		termbox.SetCell(x+i, y, char, termbox.ColorDefault, termbox.ColorDefault)
+        if g.userInput[i] == g.currentQuote.Quote[i] {
+            termbox.SetCell(x+i, y, char, termbox.ColorDefault, termbox.ColorDefault)
+        } else  {
+            termbox.SetCell(x+i, y, char, termbox.ColorBlack, termbox.ColorRed)
+        }
+        
 	}
 }
 
 func (g *Game) drawSentenceWithAuthor() {
 	width, height := termbox.Size()
 	maxLineWidth := int(float64(width) * 0.8)
-	quote := strings.Trim(g.currentQuote.Quote, " ")
+	quote := g.currentQuote.Quote
 	lines := []string{}
 
 	for len(quote) > maxLineWidth {
