@@ -24,6 +24,8 @@ type Quote struct {
 type Game struct {
 	db            *sql.DB
 	currentQuote  Quote
+    quoteY        int
+    inputY        int
 	userInput     string
 	accuracy      int
 	roundChars    int
@@ -212,48 +214,71 @@ func (g *Game) drawScore() {
 }
 
 func (g *Game) drawInput() {
-	width, height := termbox.Size()
-	x := (width - len(g.userInput)) / 2
-	y := height/2 + 1
+    width, _ := termbox.Size()
+    maxLineWidth := int(float64(width) * 0.8)
+    g.inputY = g.quoteY + 1
 
-	for i, char := range g.userInput {
-        if g.userInput[i] == g.currentQuote.Quote[i] {
-            termbox.SetCell(x+i, y, char, termbox.ColorDefault, termbox.ColorDefault)
-        } else  {
-            termbox.SetCell(x+i, y, char, termbox.ColorBlack, termbox.ColorRed)
+    // Use wrapText to get wrapped lines for user input
+    userInputLines := wrapText(g.userInput, maxLineWidth)
+
+    var k int
+
+    // Draw each line of the wrapped user input
+    for i, line := range userInputLines {
+        // Calculate x based on the length of the line
+        x := (width - len(line)) / 2
+
+        for j, char := range line {
+            if g.userInput[k] == g.currentQuote.Quote[k] {
+                termbox.SetCell(x+j, g.inputY+i, char, termbox.ColorDefault, termbox.ColorDefault)
+            } else {
+                termbox.SetCell(x+j, g.inputY+i, char, termbox.ColorBlack, termbox.ColorRed)
+            }
+            k++
         }
-        
-	}
+    }
+}
+
+func wrapText(text string, maxWidth int) []string {
+    words := strings.Fields(text)
+    lines := []string{}
+
+    currentLine := ""
+    for _, word := range words {
+        if len(currentLine)+len(word)+1 <= maxWidth {
+            currentLine += word + " "
+        } else {
+            lines = append(lines, strings.TrimSpace(currentLine))
+            currentLine = word + " "
+        }
+    }
+
+    lines = append(lines, strings.TrimSpace(currentLine))
+    return lines
 }
 
 func (g *Game) drawSentenceWithAuthor() {
-	width, height := termbox.Size()
-	maxLineWidth := int(float64(width) * 0.8)
-	quote := g.currentQuote.Quote
-	lines := []string{}
+    width, height := termbox.Size()
+    maxLineWidth := int(float64(width) * 0.8)
+    quote := g.currentQuote.Quote
+    lines := wrapText(quote, maxLineWidth)
 
-	for len(quote) > maxLineWidth {
-		lines = append(lines, quote[:maxLineWidth])
-		quote = quote[maxLineWidth:]
-	}
-	lines = append(lines, quote)
+    sentenceHeight := len(lines)
+    g.quoteY = (height - sentenceHeight) / 2
+    authorX := (width - len(g.currentQuote.Author)) / 2
+    authorY := g.quoteY - 2
 
-	sentenceHeight := len(lines)
-	y := (height - sentenceHeight) / 2
-	authorX := (width - len(g.currentQuote.Author)) / 2
-	authorY := y - 2
+    for i, char := range g.currentQuote.Author {
+        termbox.SetCell(authorX+i, authorY, char, termbox.ColorMagenta, termbox.ColorDefault)
+    }
 
-	for i, char := range g.currentQuote.Author {
-		termbox.SetCell(authorX+i, authorY, char, termbox.ColorMagenta, termbox.ColorDefault)
-	}
-
-	for _, line := range lines {
-		x := (width - len(line)) / 2
-		for i, char := range line {
-			termbox.SetCell(x+i, y, char, termbox.ColorDefault, termbox.ColorDefault)
-		}
-		y++
-	}
+    for _, line := range lines {
+        x := (width - len(line)) / 2
+        for i, char := range line {
+            termbox.SetCell(x+i, g.quoteY, char, termbox.ColorDefault, termbox.ColorDefault)
+        }
+        g.quoteY++
+   }
 }
 
 func (g *Game) drawTypingSpeed() {
