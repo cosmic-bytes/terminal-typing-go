@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math/rand"
+//	"math/rand"
 	"net/http"
 	"os"
 	"strings"
@@ -15,6 +15,15 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/nsf/termbox-go"
 )
+
+type GameStats struct {
+    Stats []StatPair
+}
+
+type StatPair struct {
+    Label string
+    Value interface{}
+}
 
 type Quote struct {
 	Quote  string `json:"q"`
@@ -38,6 +47,7 @@ type Game struct {
 	highScore     int
 	roundTime     float64
 	totalTime     float64
+    totalErrors   int
 }
 
 func main() {
@@ -57,7 +67,7 @@ func NewGame() (*Game, error) {
 	if err != nil {
 		return nil, err
 	}
-	rand.Seed(time.Now().UnixNano())
+//	rand.Seed(time.Now().UnixNano())
 
 	db, err := openDatabase()
 	if err != nil {
@@ -119,6 +129,9 @@ func (g *Game) initGame() {
 func (g *Game) handleBackspace() {
 	if len(g.userInput) > 0 {
 		g.userInput = g.userInput[:len(g.userInput)-1]
+        g.calculateAccuracy()
+        g.calculateErrors()
+        g.calculateWordsPerMinute()
 	}
 }
 
@@ -153,6 +166,7 @@ func (g *Game) handleInputCharacter(ev termbox.Event) {
 	}
 
 	g.roundChars++
+
 	if ev.Ch != 0 {
 		g.userInput += string(ev.Ch)
 	} else if ev.Key == termbox.KeySpace {
@@ -160,11 +174,10 @@ func (g *Game) handleInputCharacter(ev termbox.Event) {
 	}
 
 	g.roundTime = time.Since(g.startTime).Seconds()
-	g.typingSpeed = float64(g.roundChars) / g.roundTime
+	g.typingSpeed = float64(len(g.userInput)) / g.roundTime
     g.calculateWordsPerMinute()
-
-	accuracy := calculateAccuracy(g.userInput, g.currentQuote.Quote)
-	g.accuracy = int(accuracy * 100)
+    g.calculateAccuracy()
+    g.calculateErrors()
 
 	if len(g.userInput) >= len(g.currentQuote.Quote) {
 		g.totalTime = g.totalTime + g.roundTime
@@ -179,6 +192,16 @@ func (g *Game) handleInputCharacter(ev termbox.Event) {
 	}
 }
 
+func (g *Game) calculateErrors(){
+    roundErrors := 0
+    for i := range g.userInput {
+        if g.currentQuote.Quote[i] != g.userInput[i] {
+            roundErrors += 1
+        }
+    }
+    g.totalErrors = roundErrors
+}
+
 func (g *Game) calculateWordsPerMinute(){
 	g.wordsPerMin = g.typingSpeed * (60 / 5)
 }
@@ -187,20 +210,56 @@ func (g *Game) calculateScore(){
 	g.score = (2 * g.accuracy) * int(g.typingSpeed)
 }
 
+func (gs *GameStats) formatTopBarStr() string {
+    var statStrings []string
+
+    for _, pair := range gs.Stats {
+        statStrings = append(statStrings, fmt.Sprintf("%s: %v", pair.Label, pair.Value))
+    }
+
+    return strings.Join(statStrings, " | ")
+}
+
 func (g *Game) drawTopBar() {
-	width, _ := termbox.Size()
+    width, _ := termbox.Size()
 
     g.calculateScore()
-
     g.calculateWordsPerMinute()
 
-	topBarStr := fmt.Sprintf("Highscore: %d k | Score: %d k | Accuracy: %d | Speed: %.2f WPM | Started: %t | Chars: %d | Time: %d", g.highScore, g.score, g.accuracy, g.wordsPerMin, g.startedTyping, g.roundChars, int(g.roundTime))
-	x := (width - len(topBarStr)) / 2
-	y := 1
+    // Create an array of StatPair objects
+    stats := []StatPair{
+        {"Highscore", g.highScore},
+        {"Score", g.score},
+        {"Accuracy", g.accuracy},
+        {"WPM", int(g.wordsPerMin)},
+        {"Time", int(g.roundTime)},
+        {"Errors", g.totalErrors},
+    }
 
-	for i, char := range topBarStr {
-		termbox.SetCell(x+i, y, char, termbox.ColorDefault, termbox.ColorDefault)
-	}
+    gameStats := &GameStats{
+        Stats: stats,
+    }
+
+    // Set a maximum line length (adjust as needed)
+    maxLineLength := 60
+
+    // Generate the topBarStr from the GameStats struct
+    topBarStr := gameStats.formatTopBarStr()
+
+    // Split the string into lines
+    lines := wrapText(topBarStr, maxLineLength, "|")
+
+    // Calculate starting y position
+    y := 1
+
+    // Display each line
+    for _, line := range lines {
+        x := (width - len(line)) / 2
+        for i, char := range line {
+            termbox.SetCell(x+i, y, char, termbox.ColorDefault, termbox.ColorDefault)
+        }
+        y++
+    }
 }
 
 func (g *Game) drawScore() {
@@ -217,9 +276,10 @@ func (g *Game) drawInput() {
     width, _ := termbox.Size()
     maxLineWidth := int(float64(width) * 0.8)
     g.inputY = g.quoteY + 1
+    delimiter := " "
 
     // Use wrapText to get wrapped lines for user input
-    userInputLines := wrapText(g.userInput, maxLineWidth)
+    userInputLines := wrapText(g.userInput, maxLineWidth, delimiter)
 
     var k int
 
@@ -239,17 +299,17 @@ func (g *Game) drawInput() {
     }
 }
 
-func wrapText(text string, maxWidth int) []string {
-    words := strings.Fields(text)
+func wrapText(text string, maxWidth int, delimiter string) []string {
+    words := strings.Split(text, delimiter)
     lines := []string{}
 
     currentLine := ""
     for _, word := range words {
-        if len(currentLine)+len(word)+1 <= maxWidth {
-            currentLine += word + " "
+        if len(currentLine) + len(word) + 1 <= maxWidth {
+            currentLine += word + delimiter
         } else {
             lines = append(lines, strings.TrimSpace(currentLine))
-            currentLine = word + " "
+            currentLine = word + delimiter
         }
     }
 
@@ -261,7 +321,8 @@ func (g *Game) drawSentenceWithAuthor() {
     width, height := termbox.Size()
     maxLineWidth := int(float64(width) * 0.8)
     quote := g.currentQuote.Quote
-    lines := wrapText(quote, maxLineWidth)
+    delimiter := " "
+    lines := wrapText(quote, maxLineWidth, delimiter)
 
     sentenceHeight := len(lines)
     g.quoteY = (height - sentenceHeight) / 2
@@ -291,18 +352,18 @@ func (g *Game) drawTypingSpeed() {
 	g.drawTopBar()
 }
 
-func calculateAccuracy(input string, actual string) float64 {
-	commonLength := min(len(input), len(actual))
+func (g *Game) calculateAccuracy() {
+	commonLength := min(len(g.userInput), len(g.currentQuote.Quote))
 	correctChars := 0
 
 	for i := 0; i < commonLength; i++ {
-		if input[i] == actual[i] {
+		if g.userInput[i] == g.userInput[i] {
 			correctChars++
-		}
+        }
 	}
 
-	accuracy := float64(correctChars) / float64(len(actual))
-	return accuracy
+    accuracy := float64(correctChars) / float64(len(g.currentQuote.Quote))
+	g.accuracy = int(accuracy * 100)
 }
 
 func min(a, b int) int {
