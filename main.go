@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-//	"math/rand"
 	"net/http"
 	"os"
 	"strings"
@@ -67,7 +66,6 @@ func NewGame() (*Game, error) {
 	if err != nil {
 		return nil, err
 	}
-//	rand.Seed(time.Now().UnixNano())
 
 	db, err := openDatabase()
 	if err != nil {
