@@ -16,12 +16,12 @@ import (
 )
 
 type GameStats struct {
-    Stats []StatPair
+	Stats []StatPair
 }
 
 type StatPair struct {
-    Label string
-    Value interface{}
+	Label string
+	Value interface{}
 }
 
 type Quote struct {
@@ -32,21 +32,21 @@ type Quote struct {
 type Game struct {
 	db            *sql.DB
 	currentQuote  Quote
-    quoteY        int
-    inputY        int
+	quoteY        int
+	inputY        int
 	userInput     string
 	accuracy      int
 	roundChars    int
 	totalChars    int
 	startedTyping bool
-    wordsPerMin   float64
+	wordsPerMin   float64
 	typingSpeed   float64
 	startTime     time.Time
 	score         int
 	highScore     int
 	roundTime     float64
 	totalTime     float64
-    totalErrors   int
+	totalErrors   int
 }
 
 func main() {
@@ -83,10 +83,10 @@ func (g *Game) Start() {
 }
 
 func (g *Game) drawAll() {
-    g.drawSentenceWithAuthor()
-    g.drawInput()
-    g.drawScore()
-    g.drawTypingSpeed()
+	g.drawSentenceWithAuthor()
+	g.drawInput()
+	g.drawScore()
+	g.drawTypingSpeed()
 }
 
 func (g *Game) runGameLoop() {
@@ -95,7 +95,7 @@ func (g *Game) runGameLoop() {
 
 	for {
 		termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
-        g.drawAll()
+		g.drawAll()
 		termbox.Flush()
 
 		ev := termbox.PollEvent()
@@ -116,32 +116,31 @@ func (g *Game) initGame() {
 	if err != nil {
 		log.Fatal(err)
 	}
-    quote.Quote = strings.Trim(quote.Quote, " ")
+	quote.Quote = strings.Trim(quote.Quote, " ")
 
 	g.currentQuote = quote
 	g.userInput = ""
 	g.startedTyping = false
-
 }
 
 func (g *Game) handleBackspace() {
 	if len(g.userInput) > 0 {
 		g.userInput = g.userInput[:len(g.userInput)-1]
-        g.calculateAccuracy()
-        g.calculateErrors()
-        g.calculateWordsPerMinute()
+		g.calculateAccuracy()
+		g.calculateErrors()
+		g.calculateWordsPerMinute()
 	}
 }
 
 func (g *Game) handleControlBackspace() {
-    if len(g.userInput) > 0 {
-        lastChar := g.userInput[len(g.userInput)-1]
-        if lastChar != ' ' {
-            g.deleteLastWord()
-        } else {
-            g.handleBackspace()
-        }
-    }
+	if len(g.userInput) > 0 {
+		lastChar := g.userInput[len(g.userInput)-1]
+		if lastChar != ' ' {
+			g.deleteLastWord()
+		} else {
+			g.handleBackspace()
+		}
+	}
 }
 
 func (g *Game) deleteLastWord() {
@@ -173,9 +172,9 @@ func (g *Game) handleInputCharacter(ev termbox.Event) {
 
 	g.roundTime = time.Since(g.startTime).Seconds()
 	g.typingSpeed = float64(len(g.userInput)) / g.roundTime
-    g.calculateWordsPerMinute()
-    g.calculateAccuracy()
-    g.calculateErrors()
+	g.calculateWordsPerMinute()
+	g.calculateAccuracy()
+	g.calculateErrors()
 
 	if len(g.userInput) >= len(g.currentQuote.Quote) {
 		g.totalTime = g.totalTime + g.roundTime
@@ -190,74 +189,74 @@ func (g *Game) handleInputCharacter(ev termbox.Event) {
 	}
 }
 
-func (g *Game) calculateErrors(){
-    roundErrors := 0
-    for i := range g.userInput {
-        if g.currentQuote.Quote[i] != g.userInput[i] {
-            roundErrors += 1
-        }
-    }
-    g.totalErrors = roundErrors
+func (g *Game) calculateErrors() {
+	roundErrors := 0
+	for i := range g.userInput {
+		if g.currentQuote.Quote[i] != g.userInput[i] {
+			roundErrors += 1
+		}
+	}
+	g.totalErrors = roundErrors
 }
 
-func (g *Game) calculateWordsPerMinute(){
+func (g *Game) calculateWordsPerMinute() {
 	g.wordsPerMin = g.typingSpeed * (60 / 5)
 }
 
-func (g *Game) calculateScore(){
+func (g *Game) calculateScore() {
 	g.score = (2 * g.accuracy) * int(g.typingSpeed)
 }
 
 func (gs *GameStats) formatTopBarStr() string {
-    var statStrings []string
+	var statStrings []string
 
-    for _, pair := range gs.Stats {
-        statStrings = append(statStrings, fmt.Sprintf("%s: %v", pair.Label, pair.Value))
-    }
+	for _, pair := range gs.Stats {
+		statStrings = append(statStrings, fmt.Sprintf("%s: %v", pair.Label, pair.Value))
+	}
 
-    return strings.Join(statStrings, " | ")
+	return strings.Join(statStrings, " | ")
 }
 
 func (g *Game) drawTopBar() {
-    width, _ := termbox.Size()
+	width, _ := termbox.Size()
 
-    g.calculateScore()
-    g.calculateWordsPerMinute()
+	g.calculateScore()
+	g.calculateWordsPerMinute()
 
-    // Create an array of StatPair objects
-    stats := []StatPair{
-        {"Highscore", g.highScore},
-        {"Score", g.score},
-        {"Accuracy", g.accuracy},
-        {"WPM", int(g.wordsPerMin)},
-        {"Time", int(g.roundTime)},
-        {"Errors", g.totalErrors},
-    }
+	// Create an array of StatPair objects
+	stats := []StatPair{
+		{"Highscore", g.highScore},
+		{"Score", g.score},
+		{"Accuracy", g.accuracy},
+		{"WPM", int(g.wordsPerMin)},
+		{"Time", int(g.roundTime)},
+		{"Errors", g.totalErrors},
+	}
 
-    gameStats := &GameStats{
-        Stats: stats,
-    }
+	gameStats := &GameStats{
+		Stats: stats,
+	}
 
-    // Set a maximum line length (adjust as needed)
-    maxLineLength := 60
+	// Set a maximum line length (adjust as needed)
+	maxLineLength := 60
 
-    // Generate the topBarStr from the GameStats struct
-    topBarStr := gameStats.formatTopBarStr()
+	// Generate the topBarStr from the GameStats struct
+	topBarStr := gameStats.formatTopBarStr()
 
-    // Split the string into lines
-    lines := wrapText(topBarStr, maxLineLength, "|")
+	// Split the string into lines
+	lines := wrapText(topBarStr, maxLineLength, "|")
 
-    // Calculate starting y position
-    y := 1
+	// Calculate starting y position
+	y := 1
 
-    // Display each line
-    for _, line := range lines {
-        x := (width - len(line)) / 2
-        for i, char := range line {
-            termbox.SetCell(x+i, y, char, termbox.ColorDefault, termbox.ColorDefault)
-        }
-        y++
-    }
+	// Display each line
+	for _, line := range lines {
+		x := (width - len(line)) / 2
+		for i, char := range line {
+			termbox.SetCell(x+i, y, char, termbox.ColorDefault, termbox.ColorDefault)
+		}
+		y++
+	}
 }
 
 func (g *Game) drawScore() {
@@ -271,73 +270,73 @@ func (g *Game) drawScore() {
 }
 
 func (g *Game) drawInput() {
-    width, _ := termbox.Size()
-    maxLineWidth := int(float64(width) * 0.8)
-    g.inputY = g.quoteY + 1
-    delimiter := " "
+	width, _ := termbox.Size()
+	maxLineWidth := int(float64(width) * 0.8)
+	g.inputY = g.quoteY + 1
+	delimiter := " "
 
-    // Use wrapText to get wrapped lines for user input
-    userInputLines := wrapText(g.userInput, maxLineWidth, delimiter)
+	// Use wrapText to get wrapped lines for user input
+	userInputLines := wrapText(g.userInput, maxLineWidth, delimiter)
 
-    var k int
+	var k int
 
-    // Draw each line of the wrapped user input
-    for i, line := range userInputLines {
-        // Calculate x based on the length of the line
-        x := (width - len(line)) / 2
+	// Draw each line of the wrapped user input
+	for i, line := range userInputLines {
+		// Calculate x based on the length of the line
+		x := (width - len(line)) / 2
 
-        for j, char := range line {
-            if g.userInput[k] == g.currentQuote.Quote[k] {
-                termbox.SetCell(x+j, g.inputY+i, char, termbox.ColorDefault, termbox.ColorDefault)
-            } else {
-                termbox.SetCell(x+j, g.inputY+i, char, termbox.ColorBlack, termbox.ColorRed)
-            }
-            k++
-        }
-    }
+		for j, char := range line {
+			if g.userInput[k] == g.currentQuote.Quote[k] {
+				termbox.SetCell(x+j, g.inputY+i, char, termbox.ColorDefault, termbox.ColorDefault)
+			} else {
+				termbox.SetCell(x+j, g.inputY+i, char, termbox.ColorBlack, termbox.ColorRed)
+			}
+			k++
+		}
+	}
 }
 
 func wrapText(text string, maxWidth int, delimiter string) []string {
-    words := strings.Split(text, delimiter)
-    lines := []string{}
+	words := strings.Split(text, delimiter)
+	lines := []string{}
 
-    currentLine := ""
-    for _, word := range words {
-        if len(currentLine) + len(word) + 1 <= maxWidth {
-            currentLine += word + delimiter
-        } else {
-            lines = append(lines, strings.TrimSpace(currentLine))
-            currentLine = word + delimiter
-        }
-    }
+	currentLine := ""
+	for _, word := range words {
+		if len(currentLine)+len(word)+1 <= maxWidth {
+			currentLine += word + delimiter
+		} else {
+			lines = append(lines, strings.TrimSpace(currentLine))
+			currentLine = word + delimiter
+		}
+	}
 
-    lines = append(lines, strings.TrimSpace(currentLine))
-    return lines
+	lines = append(lines, strings.TrimSpace(currentLine))
+	return lines
 }
 
 func (g *Game) drawSentenceWithAuthor() {
-    width, height := termbox.Size()
-    maxLineWidth := int(float64(width) * 0.8)
-    quote := g.currentQuote.Quote
-    delimiter := " "
-    lines := wrapText(quote, maxLineWidth, delimiter)
+	width, height := termbox.Size()
+	maxLineWidth := int(float64(width) * 0.8)
+	quote := g.currentQuote.Quote
+	delimiter := " "
+	lines := wrapText(quote, maxLineWidth, delimiter)
 
-    sentenceHeight := len(lines)
-    g.quoteY = (height - sentenceHeight) / 2
-    authorX := (width - len(g.currentQuote.Author)) / 2
-    authorY := g.quoteY - 2
+	sentenceHeight := len(lines)
+	g.quoteY = (height - sentenceHeight) / 2
+	authorX := (width - len(g.currentQuote.Author)) / 2
+	authorY := g.quoteY - 2
 
-    for i, char := range g.currentQuote.Author {
-        termbox.SetCell(authorX+i, authorY, char, termbox.ColorMagenta, termbox.ColorDefault)
-    }
+	for i, char := range g.currentQuote.Author {
+		termbox.SetCell(authorX+i, authorY, char, termbox.ColorMagenta, termbox.ColorDefault)
+	}
 
-    for _, line := range lines {
-        x := (width - len(line)) / 2
-        for i, char := range line {
-            termbox.SetCell(x+i, g.quoteY, char, termbox.ColorDefault, termbox.ColorDefault)
-        }
-        g.quoteY++
-   }
+	for _, line := range lines {
+		x := (width - len(line)) / 2
+		for i, char := range line {
+			termbox.SetCell(x+i, g.quoteY, char, termbox.ColorDefault, termbox.ColorDefault)
+		}
+		g.quoteY++
+	}
 }
 
 func (g *Game) drawTypingSpeed() {
@@ -355,12 +354,12 @@ func (g *Game) calculateAccuracy() {
 	correctChars := 0
 
 	for i := 0; i < commonLength; i++ {
-		if g.userInput[i] == g.userInput[i] {
+		if g.currentQuote.Quote[i] == g.userInput[i] {
 			correctChars++
-        }
+		}
 	}
 
-    accuracy := float64(correctChars) / float64(len(g.currentQuote.Quote))
+	accuracy := float64(correctChars) / float64(commonLength)
 	g.accuracy = int(accuracy * 100)
 }
 
