@@ -6,11 +6,14 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/faiface/beep"
+	"github.com/faiface/beep/speaker"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/nsf/termbox-go"
 )
@@ -47,6 +50,7 @@ type Game struct {
 	roundTime     float64
 	totalTime     float64
 	totalErrors   int
+	collectKeys   bool
 }
 
 func main() {
@@ -98,6 +102,7 @@ func (g *Game) runGameLoop() {
 		g.drawAll()
 		termbox.Flush()
 
+		// if g.collectKeys {
 		ev := termbox.PollEvent()
 		if ev.Type == termbox.EventKey {
 			if ev.Key == termbox.KeyEsc {
@@ -108,7 +113,36 @@ func (g *Game) runGameLoop() {
 				g.handleInputCharacter(ev)
 			}
 		}
+		// } else {
+		// 	time.Sleep(2 * time.Second)
+		// }
 	}
+}
+
+func playPing() error {
+	// Create a beep stream for a short beep
+	streamer := beep.StreamerFunc(func(samples [][2]float64) (n int, ok bool) {
+		frequency := 440.0 // Adjust the frequency as needed
+		for i := range samples {
+			// Generate a simple sine wave for the beep
+			samples[i][0] = 0.5 * math.Sin(2.0*math.Pi*frequency*float64(i)/44100) // left channel
+			samples[i][1] = samples[i][0]                                          // right channel
+		}
+		return len(samples), true
+	})
+
+	// Initialize the speaker
+	speaker.Init(44100, 44100/10)
+
+	// Play the beep sound
+	speaker.Play(streamer)
+
+	// Wait for the sound to finish playing
+	time.Sleep(time.Second)
+
+	speaker.Clear()
+
+	return nil
 }
 
 func (g *Game) initGame() {
@@ -183,6 +217,7 @@ func (g *Game) handleInputCharacter(ev termbox.Event) {
 		if g.score > g.highScore {
 			g.highScore = g.score
 		}
+		// playPing()
 
 		g.initGame()
 		addSqlQuote(g.db, g.currentQuote.Quote, g.currentQuote.Author)
