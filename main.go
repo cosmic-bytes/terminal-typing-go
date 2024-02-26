@@ -43,7 +43,9 @@ type Game struct {
 	totalChars    int
 	startedTyping bool
 	wordsPerMin   float64
+	rawWPM        float64
 	typingSpeed   float64
+	rawSpeed      float64
 	startTime     time.Time
 	score         int
 	highScore     int
@@ -163,6 +165,7 @@ func (g *Game) handleBackspace() {
 		g.calculateAccuracy()
 		g.calculateErrors()
 		g.calculateWordsPerMinute()
+		g.calcRawSpeed()
 	}
 }
 
@@ -206,7 +209,9 @@ func (g *Game) handleInputCharacter(ev termbox.Event) {
 
 	g.roundTime = time.Since(g.startTime).Seconds()
 	g.typingSpeed = float64(len(g.userInput)) / g.roundTime
+	g.rawSpeed = float64(g.roundChars) / g.roundTime
 	g.calculateWordsPerMinute()
+	g.calcRawSpeed()
 	g.calculateAccuracy()
 	g.calculateErrors()
 
@@ -233,6 +238,9 @@ func (g *Game) calculateErrors() {
 	}
 	g.totalErrors = roundErrors
 }
+func (g *Game) calcRawSpeed() {
+	g.rawWPM = g.rawSpeed * (60 / 5)
+}
 
 func (g *Game) calculateWordsPerMinute() {
 	g.wordsPerMin = g.typingSpeed * (60 / 5)
@@ -257,6 +265,7 @@ func (g *Game) drawTopBar() {
 
 	g.calculateScore()
 	g.calculateWordsPerMinute()
+	g.calcRawSpeed()
 
 	// Create an array of StatPair objects
 	stats := []StatPair{
@@ -264,6 +273,7 @@ func (g *Game) drawTopBar() {
 		{"Score", g.score},
 		{"Accuracy", g.accuracy},
 		{"WPM", int(g.wordsPerMin)},
+		{"Raw", int(g.rawWPM)},
 		{"Time", int(g.roundTime)},
 		{"Errors", g.totalErrors},
 	}
